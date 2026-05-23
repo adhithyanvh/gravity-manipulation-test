@@ -16,6 +16,8 @@ public class PlayerController : MonoBehaviour
 
     Vector3 velocity;
 
+    public Transform cameraTransform;
+
     void Start()
     {
         characterController = GetComponent<CharacterController>();
@@ -36,7 +38,26 @@ public class PlayerController : MonoBehaviour
         float x = Input.GetAxis("Horizontal");
         float z = Input.GetAxis("Vertical");
 
-        Vector3 move = transform.right * x + transform.forward * z;
+        Vector3 camForward = cameraTransform.forward;
+        Vector3 camRight = cameraTransform.right;
+
+        camForward.y = 0f;
+        camRight.y = 0f;
+
+        camForward.Normalize();
+        camRight.Normalize();
+
+        Vector3 move = camForward * z + camRight * x;
+        if (move.magnitude > 0.1f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(move);
+
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                targetRotation,
+                10f * Time.deltaTime
+            );
+        }
 
         characterController.Move(move * moveSpeed * Time.deltaTime);
 

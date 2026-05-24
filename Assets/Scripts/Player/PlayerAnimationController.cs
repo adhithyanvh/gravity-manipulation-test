@@ -15,8 +15,14 @@ public class PlayerAnimationController : MonoBehaviour
 
         float z = (Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.S) ? 1f : 0f);
 
-        Vector2 movement = new Vector2(x, z);
+        float speed = 0f;
 
-        animator.SetFloat("Speed", movement.magnitude);
+        // ONLY FORWARD MOVEMENT
+        if (Input.GetKey(KeyCode.W))
+        {
+            speed = 1f;
+        }
+
+        animator.SetFloat("Speed", speed);
     }
 }

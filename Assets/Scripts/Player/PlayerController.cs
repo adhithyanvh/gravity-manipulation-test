@@ -15,7 +15,13 @@ public class PlayerController : MonoBehaviour
 
     Vector3 gravityVelocity;
 
+    [Header("Ghost Preview")]
+    public GameObject gravityGhost;
+
+    // START WITH NORMAL DOWN GRAVITY
     Vector3 gravityDirection = Vector3.down;
+
+    // STORE SELECTED DIRECTION
     Vector3 selectedGravityDirection;
 
     public Transform cameraTransform;
@@ -23,6 +29,7 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         characterController = GetComponent<CharacterController>();
+
         selectedGravityDirection = gravityDirection;
     }
 
@@ -42,27 +49,24 @@ public class PlayerController : MonoBehaviour
         float x = 0f;
         float z = 0f;
 
-        x = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
+        x = (Input.GetKey(KeyCode.D) ? 1f : 0f)
+            - (Input.GetKey(KeyCode.A) ? 1f : 0f);
 
-        z = (Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.S) ? 1f : 0f);
+        z = (Input.GetKey(KeyCode.W) ? 1f : 0f)
+            - (Input.GetKey(KeyCode.S) ? 1f : 0f);
 
-        Vector3 camForward = cameraTransform.forward;
-        Vector3 camRight = cameraTransform.right;
+        // MOVEMENT BASED ON CAMERA
+        Vector3 camForward = Vector3.ProjectOnPlane(
+            cameraTransform.forward,
+            gravityDirection
+        ).normalized;
 
-        camForward.y = 0f;
-        camRight.y = 0f;
-
-        camForward.Normalize();
-        camRight.Normalize();
+        Vector3 camRight = Vector3.ProjectOnPlane(
+            cameraTransform.right,
+            gravityDirection
+        ).normalized;
 
         Vector3 move = camForward * z + camRight * x;
-
-        if (move.magnitude > 0.1f)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(move);
-
-            transform.rotation = Quaternion.Slerp(transform.rotation,targetRotation,10f * Time.deltaTime);
-        }
 
         characterController.Move(move * moveSpeed * Time.deltaTime);
 
@@ -71,75 +75,122 @@ public class PlayerController : MonoBehaviour
 
     void ApplyGravity()
     {
-        
+        // STOP EXTRA PUSHING WHEN GROUNDED
+        if (characterController.isGrounded)
+        {
+            gravityVelocity = Vector3.zero;
+        }
+
         gravityVelocity += gravityDirection * gravityValue * Time.deltaTime;
 
         gravityVelocity = Vector3.ClampMagnitude(gravityVelocity, 15f);
-        Debug.Log("Gravity Velocity =" + gravityVelocity);
     }
 
     void Jump()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.Space) && characterController.isGrounded)
         {
-           
             gravityVelocity = Vector3.zero;
 
+            // JUMP OPPOSITE TO GRAVITY
             gravityVelocity = -gravityDirection * jumpForce;
         }
     }
 
     void GravityInput()
     {
-        
+        // LEFT RELATIVE TO PLAYER
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
-            //gravityDirection = -cameraTransform.right;
-            Debug.Log("gravity dir = left");
-            selectedGravityDirection = -cameraTransform.right;
+            selectedGravityDirection = -transform.right;
+
+            ShowGravityGhost(-transform.right);
         }
 
-        
+        // RIGHT RELATIVE TO PLAYER
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
-            //gravityDirection = cameraTransform.right;
-            Debug.Log("gravity dir = right");
-            selectedGravityDirection = cameraTransform.right;
+            selectedGravityDirection = transform.right;
 
+            ShowGravityGhost(transform.right);
         }
 
-
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
-            Vector3 forwardDir = cameraTransform.forward;
-
-            
-            forwardDir.y = 0f;
-
-            forwardDir.Normalize();
-
-            selectedGravityDirection = forwardDir;
-            Debug.Log("gravity dir = up");
-        }
-
-        
+        // DOWN RELATIVE TO PLAYER
         if (Input.GetKeyDown(KeyCode.DownArrow))
         {
-            Vector3 backwardDir = -cameraTransform.forward;
+            selectedGravityDirection = -transform.up;
 
-            backwardDir.y = 0f;
-
-            backwardDir.Normalize();
-
-            selectedGravityDirection = backwardDir;
-            Debug.Log("gravity dir = down");
+            ShowGravityGhost(-transform.up);
         }
 
+        // APPLY GRAVITY
         if (Input.GetKeyDown(KeyCode.Return))
         {
+            if (selectedGravityDirection == gravityDirection)
+            {
+                return;
+            }
+
+            gravityVelocity = Vector3.zero;
+
             gravityDirection = selectedGravityDirection;
-            Debug.Log("Gravity Confirmed!");
-           
+
+            RotatePlayerToGravity();
+
+            HideGravityGhost();
         }
+    }
+
+    void RotatePlayerToGravity()
+    {
+        Quaternion targetRotation =
+            Quaternion.FromToRotation(
+                transform.up,
+                -gravityDirection
+            ) * transform.rotation;
+
+        transform.rotation = targetRotation;
+    }
+
+    void ShowGravityGhost(Vector3 direction)
+    {
+        gravityGhost.SetActive(true);
+
+        gravityGhost.transform.localPosition = Vector3.zero;
+        gravityGhost.transform.localRotation = Quaternion.identity;
+
+        // LEFT SIDE
+        if (direction == -transform.right)
+        {
+            gravityGhost.transform.localPosition =
+                new Vector3(-2f, 2f, 0f);
+
+            gravityGhost.transform.localRotation =
+                Quaternion.Euler(0f, 0f, 90f);
+        }
+
+        // RIGHT SIDE
+        else if (direction == transform.right)
+        {
+            gravityGhost.transform.localPosition =
+                new Vector3(2f, 2f, 0f);
+
+            gravityGhost.transform.localRotation =
+                Quaternion.Euler(0f, 0f, -90f);
+        }
+
+        // FLOOR
+        else if (direction == -transform.up)
+        {
+            gravityGhost.transform.localPosition =
+                Vector3.zero;
+
+            gravityGhost.transform.localRotation =
+                Quaternion.identity;
+        }
+    }
+    void HideGravityGhost()
+    {
+        gravityGhost.SetActive(false);
     }
 }
